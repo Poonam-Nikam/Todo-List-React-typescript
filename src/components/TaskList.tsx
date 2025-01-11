@@ -1,97 +1,111 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../redux/Store';
-import { toggleTask, deleteTask } from '../redux/TaskSlice';
+import { setFilter, deleteTask, markCompleted, updateTaskOrder } from '../redux/TaskSlice';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 const TaskList: React.FC = () => {
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
+  const filter = useSelector((state: RootState) => state.tasks.filter);
   const dispatch = useDispatch();
 
-  // Local state for the filter (All, Completed, Pending)
-  const [filter, setFilter] = useState<'All' | 'Completed' | 'Pending'>('All');
+  // Filter tasks based on status
+  const filteredTasks = tasks.filter((task) => {
+    if (filter === 'completed') return task.completed;
+    if (filter === 'pending') return !task.completed;
+    return true; // 'all'
+  });
 
-  // Calculate the count of completed and pending tasks
+  // Count completed and pending tasks
   const completedCount = tasks.filter((task) => task.completed).length;
   const pendingCount = tasks.filter((task) => !task.completed).length;
 
-  // Filter tasks based on the selected filter
-  const filteredTasks = tasks.filter((task) => {
-    if (filter === 'Completed') return task.completed;
-    if (filter === 'Pending') return !task.completed;
-    return true; // 'All'
-  });
+  // Handle drag end
+  const handleDragEnd = (result: any) => {
+    const { destination, source } = result;
+    if (!destination) return; // If there's no destination (task dropped outside)
+
+    // Reorder tasks
+    const reorderedTasks = Array.from(tasks);
+    const [removed] = reorderedTasks.splice(source.index, 1);
+    reorderedTasks.splice(destination.index, 0, removed);
+
+    // Update the task order in the Redux store
+    dispatch(updateTaskOrder(reorderedTasks));
+  };
 
   return (
-    <div className="max-w-md mx-auto border border-black p-6 bg-gray-100 rounded-md shadow-lg">
-      {/* Task Counts */}
-      <div className="mb-4 text-center">
-        <p className="text-sm text-gray-700">
-          <span className="font-bold">Completed:</span> {completedCount} |{' '}
-          <span className="font-bold">Pending:</span> {pendingCount}
-        </p>
-      </div>
-
+    <div className="p-4">
       {/* Filter Buttons */}
-      <div className="flex justify-center gap-2 mb-6">
+      <div className="mb-4 flex space-x-2">
         <button
-          className={`px-3 py-1 text-sm rounded ${
-            filter === 'All' ? 'bg-blue-500 text-white' : 'bg-gray-200'
-          }`}
-          onClick={() => setFilter('All')}
+          onClick={() => dispatch(setFilter('all'))}
+          className={`px-3 py-1 text-sm rounded ${filter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
         >
           All
         </button>
         <button
-          className={`px-3 py-1 text-sm rounded ${
-            filter === 'Completed' ? 'bg-blue-500 text-white' : 'bg-gray-200'
-          }`}
-          onClick={() => setFilter('Completed')}
+          onClick={() => dispatch(setFilter('completed'))}
+          className={`px-3 py-1 text-sm rounded ${filter === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
         >
           Completed
         </button>
         <button
-          className={`px-3 py-1 text-sm rounded ${
-            filter === 'Pending' ? 'bg-blue-500 text-white' : 'bg-gray-200'
-          }`}
-          onClick={() => setFilter('Pending')}
+          onClick={() => dispatch(setFilter('pending'))}
+          className={`px-3 py-1 text-sm rounded ${filter === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
         >
           Pending
         </button>
       </div>
 
-      {/* Task List */}
-      {filteredTasks.map((task) => (
-        <div
-          key={task.id}
-          className={`p-4 mb-4 border rounded ${
-            task.completed ? 'bg-green-100' : 'bg-white'
-          }`}
-        >
-          <h3 className={`text-lg font-bold ${task.completed && 'line-through'}`}>
-            {task.title}
-          </h3>
-          {task.description && <p>{task.description}</p>}
-          {task.dueDate && (
-            <p className="text-sm text-gray-600">Due: {task.dueDate}</p>
+      {/* Task Count */}
+      <div className="flex justify-between mb-4 text-sm">
+        <p>Completed: {completedCount}</p>
+        <p>Pending: {pendingCount}</p>
+      </div>
+
+      {/* Drag and Drop */}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="tasks">
+          {(provided) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+            >
+              {filteredTasks.map((task, index) => (
+                <Draggable key={task.id} draggableId={task.id} index={index}>
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      {...provided.dragHandleProps}
+                      className="p-4 bg-white shadow rounded mb-2"
+                    >
+                      <h3 className={`font-bold ${task.completed ? 'line-through text-gray-500' : ''}`}>{task.title}</h3>
+                      <p>{task.description}</p>
+                      <div>
+                        <button
+                          onClick={() => dispatch(markCompleted(task.id))}
+                          className="mr-2 bg-green-500 text-white px-2 py-1 rounded"
+                        >
+                          {task.completed ? 'Undo' : 'Complete'}
+                        </button>
+                        <button
+                          onClick={() => dispatch(deleteTask(task.id))}
+                          className="bg-red-500 text-white px-2 py-1 rounded"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
           )}
-          <div className="flex justify-end gap-2 mt-2">
-            <button
-              onClick={() => dispatch(toggleTask(task.id))}
-              className={`px-4 py-2 rounded ${
-                task.completed ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'
-              }`}
-            >
-              {task.completed ? 'Undo' : 'Complete'}
-            </button>
-            <button
-              onClick={() => dispatch(deleteTask(task.id))}
-              className="bg-red-500 text-white px-4 py-2 rounded"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ))}
+        </Droppable>
+      </DragDropContext>
     </div>
   );
 };

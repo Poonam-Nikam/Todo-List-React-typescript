@@ -5,7 +5,7 @@ import { addTask } from '../redux/TaskSlice';
 const AddTask: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState(''); // New state for due date
   const dispatch = useDispatch();
 
   const handleAddTask = () => {
@@ -14,19 +14,19 @@ const AddTask: React.FC = () => {
       return;
     }
 
-    // Create a new task with a due date
-    dispatch(addTask({
-      id: Date.now().toString(),
-      title,
-      description,
-      completed: false,
-      dueDate: dueDate || '', // Default to an empty string if no due date
-    }));
+    dispatch(
+      addTask({
+        id: Date.now().toString(),
+        title,
+        description,
+        dueDate, // Add due date
+        completed: false,
+      })
+    );
 
-    // Clear input fields
     setTitle('');
     setDescription('');
-    setDueDate('');
+    setDueDate(''); // Reset due date
   };
 
   return (
